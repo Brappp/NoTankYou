@@ -9,8 +9,11 @@ public abstract class ConsumableModule<T> : ModuleBase<T> where T : ConsumableCo
     protected abstract uint IconId { get; }
     protected abstract string IconLabel { get; }
     protected abstract uint StatusId { get; }
+    public override bool SelfOnly => true;
 
     protected override bool ShouldEvaluate(IPlayerData playerData) {
+        // Self-only module
+        if (Services.ObjectTable.LocalPlayer?.EntityId != playerData.GetEntityId()) return false;
         if (Config.SuppressInCombat && Services.Condition.IsInCombat()) return false;
 
         return true;

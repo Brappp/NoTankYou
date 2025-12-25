@@ -62,7 +62,7 @@ public class PartyOverlayWindow : Window {
         // In test mode, always show (we'll draw above self)
         if (System.SystemConfig.TestMode) return true;
 
-        if (System.ShouldHidePartyOverlayForCombat()) return false;
+        if (System.ShouldHideDisplayMode(DisplayMode.PartyOverlay)) return false;
         if (partyWarnings.Count == 0) return false;
 
         return true;

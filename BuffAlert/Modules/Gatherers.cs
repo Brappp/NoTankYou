@@ -10,6 +10,7 @@ public class Gatherers : ModuleBase<GatherersConfig> {
     protected override string DefaultWarningText => "Status Missing";
     // Prospect, King's Yield II, Triangulate, Blessed Harvest II, Surface Slap, Veteran Trade, Collector's Glove
     public override uint[] CheckedActionIds => [227, 238, 210, 221, 7903, 7911, 4101];
+    public override bool SelfOnly => true;
 
     private const uint MinerClassJobId = 16;
     private const uint BotanistClassJobId = 17;
@@ -27,8 +28,11 @@ public class Gatherers : ModuleBase<GatherersConfig> {
         new (FisherClassJobId, 50, 805, 4101),
     ];
     
-    protected override bool ShouldEvaluate(IPlayerData playerData) 
-        => playerData.GetClassJob() is 16 or 17 or 18;
+    protected override bool ShouldEvaluate(IPlayerData playerData) {
+        // Self-only module
+        if (Services.ObjectTable.LocalPlayer?.EntityId != playerData.GetEntityId()) return false;
+        return playerData.GetClassJob() is 16 or 17 or 18;
+    }
 
     protected override void EvaluateWarnings(IPlayerData playerData) {
         foreach (var jobData in data) {

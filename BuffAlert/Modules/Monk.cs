@@ -11,6 +11,7 @@ public class Monk : ModuleBase<MonkConfiguration> {
 	public override ModuleName ModuleName => ModuleName.Monk;
 	protected override string DefaultWarningText => "Monk Warning";
 	public override uint[] CheckedActionIds => [MantraActionId, FormlessFistActionId];
+	public override bool SelfOnly => true;
 
 	private const byte MinimumLevel = 40;
 	private const byte MonkClassJob = 20;
@@ -25,6 +26,7 @@ public class Monk : ModuleBase<MonkConfiguration> {
 	private DateTime lastCombatTime = DateTime.UtcNow;
 	
 	protected override bool ShouldEvaluate(IPlayerData playerData) {
+		// Self-only module (requires job gauge)
 		if (Services.ObjectTable.LocalPlayer?.EntityId != playerData.GetEntityId()) return false;
 		if (!playerData.HasClassJob(MonkClassJob)) return false;
 		if (playerData.GetLevel() < MinimumLevel) return false;
@@ -38,20 +40,18 @@ public class Monk : ModuleBase<MonkConfiguration> {
 		}
 
 		if (DateTime.UtcNow - lastCombatTime > TimeSpan.FromSeconds(Config.WarningDelay)) {
-			
-			// Mantra
+			// Mantra (Chakra gauge)
 			if (playerData.GetLevel() >= MantraMinimumLevel) {
 				if (Services.JobGauges.Get<MNKGauge>().Chakra < 5) {
 					AddActiveWarning(MantraActionId, playerData);
 					return;
 				}
 			}
-			
-			// Formless Fist
+
+			// Formless Fist (status effect)
 			if (playerData.GetLevel() >= FormlessFistMinimumLevel) {
 				if (Config.FormlessFist && playerData.MissingStatus(FormlessFistStatusEffect)) {
 					AddActiveWarning(FormlessFistActionId, playerData);
-					return;
 				}
 			}
 		}

@@ -9,6 +9,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Bindings.ImGui;
 using Lumina.Excel.Sheets;
 using BuffAlert.Classes;
+using BuffAlert.Configuration;
 using Vector4 = System.Numerics.Vector4;
 
 namespace BuffAlert.Windows;
@@ -23,7 +24,7 @@ public class ConfigurationWindow : Window {
         { ModuleCategory.General, ("General", 62574, new Vector4(0.7f, 0.7f, 0.7f, 1f)) },
     };
 
-    public ConfigurationWindow() : base("NoTankYou - Configuration", ImGuiWindowFlags.None) {
+    public ConfigurationWindow() : base("BuffAlert - Configuration", ImGuiWindowFlags.None) {
         Size = new Vector2(500, 600);
         SizeCondition = ImGuiCond.FirstUseEver;
     }
@@ -56,6 +57,17 @@ public class ConfigurationWindow : Window {
         ImGui.Separator();
         ImGui.Spacing();
 
+        // Status indicator
+        DrawStatusIndicator();
+
+        ImGui.Spacing();
+
+        // Legend for S/P/O columns
+        DrawColumnLegend();
+
+        ImGui.Spacing();
+        ImGui.Separator();
+
         // Modules grouped by category
         var modulesByCategory = System.ModuleController.Modules
             .GroupBy(m => m.ModuleName.GetAttribute<ModuleCategoryAttribute>()?.Category ?? ModuleCategory.General)
@@ -66,18 +78,75 @@ public class ConfigurationWindow : Window {
         }
     }
 
+    private void DrawStatusIndicator() {
+        var warningCount = System.ActiveWarnings.Count;
+        var soloSuppressed = System.SuppressionManager.IsDisplayModeSuppressed(DisplayMode.Solo);
+        var partyFrameSuppressed = System.SuppressionManager.IsDisplayModeSuppressed(DisplayMode.PartyFrame);
+        var overlaySuppressed = System.SuppressionManager.IsDisplayModeSuppressed(DisplayMode.PartyOverlay);
+
+        // Status text
+        if (warningCount == 0) {
+            ImGui.TextColored(new Vector4(0.5f, 0.8f, 0.5f, 1f), "No active warnings");
+        }
+        else {
+            var warningText = warningCount == 1 ? "1 warning active" : $"{warningCount} warnings active";
+            ImGui.TextColored(new Vector4(1f, 0.8f, 0.3f, 1f), warningText);
+        }
+
+        // Suppression status
+        if (soloSuppressed || partyFrameSuppressed || overlaySuppressed) {
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), " | Hidden:");
+
+            if (soloSuppressed) {
+                ImGui.SameLine();
+                ImGui.TextColored(new Vector4(0.4f, 0.7f, 1f, 0.7f), "S");
+            }
+            if (partyFrameSuppressed) {
+                ImGui.SameLine();
+                ImGui.TextColored(new Vector4(1f, 0.7f, 0.4f, 0.7f), "P");
+            }
+            if (overlaySuppressed) {
+                ImGui.SameLine();
+                ImGui.TextColored(new Vector4(0.7f, 1f, 0.4f, 0.7f), "O");
+            }
+        }
+    }
+
+    private void DrawColumnLegend() {
+        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), "Display toggles:");
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.4f, 0.7f, 1f, 1f), "S");
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "Solo");
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(1f, 0.7f, 0.4f, 1f), "P");
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "Party Frame");
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.7f, 1f, 0.4f, 1f), "O");
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "Overlay");
+    }
+
     private void DrawCategorySection(ModuleCategory category, List<ModuleBase> modules) {
         var (categoryName, iconId, color) = CategoryInfo[category];
 
-        ImGui.Spacing();
+        // Collapsible header for each category
+        ImGui.PushStyleColor(ImGuiCol.Header, new Vector4(color.X * 0.3f, color.Y * 0.3f, color.Z * 0.3f, 0.5f));
+        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(color.X * 0.4f, color.Y * 0.4f, color.Z * 0.4f, 0.7f));
+        ImGui.PushStyleColor(ImGuiCol.HeaderActive, new Vector4(color.X * 0.5f, color.Y * 0.5f, color.Z * 0.5f, 0.9f));
 
-        // Category header with colored text
-        ImGui.TextColored(color, categoryName);
-        ImGui.Separator();
+        var isOpen = ImGui.CollapsingHeader($"{categoryName} ({modules.Count})###{category}", ImGuiTreeNodeFlags.DefaultOpen);
 
-        // Single column layout for cleaner display
-        foreach (var module in modules) {
-            DrawModuleEntry(module);
+        ImGui.PopStyleColor(3);
+
+        if (isOpen) {
+            using (ImRaii.PushIndent(8f)) {
+                foreach (var module in modules) {
+                    DrawModuleEntry(module);
+                }
+            }
         }
 
         ImGui.Spacing();
@@ -108,20 +177,60 @@ public class ConfigurationWindow : Window {
             module.IsEnabled = enabled;
         }
 
+        // Show module requirement indicators
+        if (module.SelfOnly) {
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "(self only)");
+        }
+        else if (module.RequiresParty) {
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.7f, 0.5f, 0.9f, 1f), "(party 2+)");
+            if (ImGui.IsItemHovered()) {
+                ImGui.SetTooltip("This module only activates when in a party of 2 or more");
+            }
+        }
+
         // Per-action display settings (when module is enabled)
         if (module.IsEnabled && module.CheckedActionIds.Length > 0) {
             var actionSheet = Services.DataManager.GetExcelSheet<Action>();
             var configChanged = false;
+            var isSelfOnly = module.SelfOnly;
+
+            // Colors matching the section headers
+            var soloColor = new Vector4(0.4f, 0.7f, 1f, 1f);      // Blue
+            var partyFrameColor = new Vector4(1f, 0.7f, 0.4f, 1f); // Orange
+            var overlayColor = new Vector4(0.7f, 1f, 0.4f, 1f);    // Green
 
             using (ImRaii.PushIndent(28f)) {
-                // Table for action settings
-                using (var table = ImRaii.Table($"Actions_{module.ModuleName}", 4, ImGuiTableFlags.BordersInnerH)) {
+                // Table for action settings - only show S column for self-only modules
+                var columnCount = isSelfOnly ? 2 : 4;
+                using (var table = ImRaii.Table($"Actions_{module.ModuleName}", columnCount, ImGuiTableFlags.BordersInnerH)) {
                     if (table) {
-                        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthStretch);
+                        ImGui.TableSetupColumn("Action", ImGuiTableColumnFlags.WidthStretch);
                         ImGui.TableSetupColumn("S", ImGuiTableColumnFlags.WidthFixed, 25 * ImGuiHelpers.GlobalScale);
-                        ImGui.TableSetupColumn("P", ImGuiTableColumnFlags.WidthFixed, 25 * ImGuiHelpers.GlobalScale);
-                        ImGui.TableSetupColumn("O", ImGuiTableColumnFlags.WidthFixed, 25 * ImGuiHelpers.GlobalScale);
-                        ImGui.TableHeadersRow();
+                        if (!isSelfOnly) {
+                            ImGui.TableSetupColumn("P", ImGuiTableColumnFlags.WidthFixed, 25 * ImGuiHelpers.GlobalScale);
+                            ImGui.TableSetupColumn("O", ImGuiTableColumnFlags.WidthFixed, 25 * ImGuiHelpers.GlobalScale);
+                        }
+
+                        // Custom header row with colored text
+                        ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+                        ImGui.TableNextColumn();
+                        ImGui.Text("Action");
+
+                        ImGui.TableNextColumn();
+                        ImGui.TextColored(soloColor, "S");
+                        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Solo Warnings - your own warning bar");
+
+                        if (!isSelfOnly) {
+                            ImGui.TableNextColumn();
+                            ImGui.TextColored(partyFrameColor, "P");
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Party Frame - party members' warning bar");
+
+                            ImGui.TableNextColumn();
+                            ImGui.TextColored(overlayColor, "O");
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Party Overlay - icons above party members' heads");
+                        }
 
                         foreach (var actionId in module.CheckedActionIds) {
                             var action = actionSheet.GetRowOrDefault(actionId);
@@ -142,20 +251,23 @@ public class ConfigurationWindow : Window {
                             }
                             ImGui.Text(action.Value.Name.ToString());
 
-                            // S column
+                            // S column (Solo - always shown)
                             ImGui.TableNextColumn();
                             configChanged |= ImGui.Checkbox("##S", ref settings.ShowInSolo);
-                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Solo");
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Show in Solo warnings bar");
 
-                            // P column
-                            ImGui.TableNextColumn();
-                            configChanged |= ImGui.Checkbox("##P", ref settings.ShowInPartyFrame);
-                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Party Frame");
+                            // P and O columns only for party-capable modules
+                            if (!isSelfOnly) {
+                                // P column (Party Frame)
+                                ImGui.TableNextColumn();
+                                configChanged |= ImGui.Checkbox("##P", ref settings.ShowInPartyFrame);
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Show in Party Frame bar");
 
-                            // O column
-                            ImGui.TableNextColumn();
-                            configChanged |= ImGui.Checkbox("##O", ref settings.ShowInPartyOverlay);
-                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Party Overlay");
+                                // O column (Party Overlay)
+                                ImGui.TableNextColumn();
+                                configChanged |= ImGui.Checkbox("##O", ref settings.ShowInPartyOverlay);
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Show above party members' heads");
+                            }
                         }
                     }
                 }
@@ -195,133 +307,141 @@ public class ConfigurationWindow : Window {
         var configChanged = false;
 
         configChanged |= ImGui.Checkbox("Enabled", ref config.Enabled);
-
         ImGui.SameLine();
         ImGui.Checkbox("Test Mode", ref config.TestMode);
-        if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Show test warnings to position the UI elements");
-        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Show test warnings to position the UI elements");
 
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1f), "Display Modes:");
+        ImGui.Separator();
 
-        configChanged |= ImGui.Checkbox("Solo Warnings", ref config.SoloMode);
-        if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Show a warning bar for your own missing buffs");
-        }
+        // ===== SOLO WARNINGS (S) =====
+        ImGui.TextColored(new Vector4(0.4f, 0.7f, 1f, 1f), "Solo Warnings (S)");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Warning bar for your own missing buffs");
+
+        configChanged |= ImGui.Checkbox("Enabled##Solo", ref config.SoloMode);
         if (config.SoloMode) {
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(60 * ImGuiHelpers.GlobalScale);
-            configChanged |= ImGui.DragFloat("##SoloSize", ref config.SoloIconSize, 1f, 16f, 64f, "%.0f");
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Icon size");
+            ImGui.SetNextItemWidth(50 * ImGuiHelpers.GlobalScale);
+            configChanged |= ImGui.DragFloat("Size##Solo", ref config.SoloIconSize, 1f, 16f, 64f, "%.0f");
 
             ImGui.SameLine();
             var soloBgColor = new Vector4(config.SoloBgColor_R, config.SoloBgColor_G, config.SoloBgColor_B, config.SoloBgColor_A);
-            if (ImGui.ColorEdit4("##SoloBg", ref soloBgColor, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar)) {
+            if (ImGui.ColorEdit4("BG##Solo", ref soloBgColor, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar)) {
                 config.SoloBgColor_R = soloBgColor.X;
                 config.SoloBgColor_G = soloBgColor.Y;
                 config.SoloBgColor_B = soloBgColor.Z;
                 config.SoloBgColor_A = soloBgColor.W;
                 configChanged = true;
             }
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Background color");
 
-            ImGui.SameLine();
-            configChanged |= ImGui.Checkbox("Hide##SoloCombat", ref config.SoloHideInCombat);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Hide in combat");
-            if (config.SoloHideInCombat) {
+            // Suppress mode
+            using (ImRaii.PushIndent()) {
+                ImGui.Text("Hide:");
                 ImGui.SameLine();
-                ImGui.SetNextItemWidth(40 * ImGuiHelpers.GlobalScale);
-                configChanged |= ImGui.InputInt("##SoloCombatDelay", ref config.SoloHideInCombatDelay);
-                if (config.SoloHideInCombatDelay < 0) config.SoloHideInCombatDelay = 0;
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Seconds in combat before hiding");
+                ImGui.SetNextItemWidth(120 * ImGuiHelpers.GlobalScale);
+                var soloSuppressMode = (int)config.SoloSuppressMode;
+                if (ImGui.Combo("##SoloSuppress", ref soloSuppressMode, "Never\0After Time\0On Combat\0")) {
+                    config.SoloSuppressMode = (SuppressMode)soloSuppressMode;
+                    configChanged = true;
+                }
+                if (config.SoloSuppressMode != SuppressMode.Never) {
+                    ImGui.SameLine();
+                    ImGui.SetNextItemWidth(40 * ImGuiHelpers.GlobalScale);
+                    configChanged |= ImGui.InputInt("sec##SoloDelay", ref config.SoloSuppressDelay);
+                    if (config.SoloSuppressDelay < 0) config.SoloSuppressDelay = 0;
+                }
             }
         }
 
-        configChanged |= ImGui.Checkbox("Party Frame", ref config.PartyFrameMode);
-        if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Show a warning bar for party members' missing buffs");
-        }
+        ImGui.Spacing();
+        ImGui.Separator();
+
+        // ===== PARTY FRAME (P) =====
+        ImGui.TextColored(new Vector4(1f, 0.7f, 0.4f, 1f), "Party Frame (P)");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Warning bar for party members' missing buffs");
+
+        configChanged |= ImGui.Checkbox("Enabled##PartyFrame", ref config.PartyFrameMode);
         if (config.PartyFrameMode) {
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(60 * ImGuiHelpers.GlobalScale);
-            configChanged |= ImGui.DragFloat("##PartyFrameSize", ref config.PartyFrameIconSize, 1f, 16f, 64f, "%.0f");
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Icon size");
+            ImGui.SetNextItemWidth(50 * ImGuiHelpers.GlobalScale);
+            configChanged |= ImGui.DragFloat("Size##PartyFrame", ref config.PartyFrameIconSize, 1f, 16f, 64f, "%.0f");
 
             ImGui.SameLine();
             var partyBgColor = new Vector4(config.PartyFrameBgColor_R, config.PartyFrameBgColor_G, config.PartyFrameBgColor_B, config.PartyFrameBgColor_A);
-            if (ImGui.ColorEdit4("##PartyFrameBg", ref partyBgColor, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar)) {
+            if (ImGui.ColorEdit4("BG##PartyFrame", ref partyBgColor, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar)) {
                 config.PartyFrameBgColor_R = partyBgColor.X;
                 config.PartyFrameBgColor_G = partyBgColor.Y;
                 config.PartyFrameBgColor_B = partyBgColor.Z;
                 config.PartyFrameBgColor_A = partyBgColor.W;
                 configChanged = true;
             }
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Background color");
 
-            ImGui.SameLine();
-            configChanged |= ImGui.Checkbox("Hide##PartyFrameCombat", ref config.PartyFrameHideInCombat);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Hide in combat");
-            if (config.PartyFrameHideInCombat) {
+            // Suppress mode
+            using (ImRaii.PushIndent()) {
+                ImGui.Text("Hide:");
                 ImGui.SameLine();
-                ImGui.SetNextItemWidth(40 * ImGuiHelpers.GlobalScale);
-                configChanged |= ImGui.InputInt("##PartyFrameCombatDelay", ref config.PartyFrameHideInCombatDelay);
-                if (config.PartyFrameHideInCombatDelay < 0) config.PartyFrameHideInCombatDelay = 0;
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Seconds in combat before hiding");
-            }
-        }
-
-        configChanged |= ImGui.Checkbox("Party Overlay", ref config.PartyOverlayMode);
-        if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Show warning icons above party members' heads in the world");
-        }
-        if (config.PartyOverlayMode) {
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(60 * ImGuiHelpers.GlobalScale);
-            configChanged |= ImGui.DragFloat("##PartyOverlaySize", ref config.PartyOverlayIconSize, 1f, 16f, 64f, "%.0f");
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Icon size");
-
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(60 * ImGuiHelpers.GlobalScale);
-            configChanged |= ImGui.DragFloat("##PartyOverlayHeight", ref config.PartyOverlayHeightOffset, 0.1f, 0f, 5f, "%.1f");
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Height above player");
-
-            ImGui.SameLine();
-            configChanged |= ImGui.Checkbox("Hide##PartyOverlayCombat", ref config.PartyOverlayHideInCombat);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Hide in combat");
-            if (config.PartyOverlayHideInCombat) {
-                ImGui.SameLine();
-                ImGui.SetNextItemWidth(40 * ImGuiHelpers.GlobalScale);
-                configChanged |= ImGui.InputInt("##PartyOverlayCombatDelay", ref config.PartyOverlayHideInCombatDelay);
-                if (config.PartyOverlayHideInCombatDelay < 0) config.PartyOverlayHideInCombatDelay = 0;
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Seconds in combat before hiding");
+                ImGui.SetNextItemWidth(120 * ImGuiHelpers.GlobalScale);
+                var partyFrameSuppressMode = (int)config.PartyFrameSuppressMode;
+                if (ImGui.Combo("##PartyFrameSuppress", ref partyFrameSuppressMode, "Never\0After Time\0On Combat\0")) {
+                    config.PartyFrameSuppressMode = (SuppressMode)partyFrameSuppressMode;
+                    configChanged = true;
+                }
+                if (config.PartyFrameSuppressMode != SuppressMode.Never) {
+                    ImGui.SameLine();
+                    ImGui.SetNextItemWidth(40 * ImGuiHelpers.GlobalScale);
+                    configChanged |= ImGui.InputInt("sec##PartyFrameDelay", ref config.PartyFrameSuppressDelay);
+                    if (config.PartyFrameSuppressDelay < 0) config.PartyFrameSuppressDelay = 0;
+                }
             }
         }
 
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1f), "Conditions:");
+        ImGui.Separator();
+
+        // ===== PARTY OVERLAY (O) =====
+        ImGui.TextColored(new Vector4(0.7f, 1f, 0.4f, 1f), "Party Overlay (O)");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Icons floating above party members' heads");
+
+        configChanged |= ImGui.Checkbox("Enabled##PartyOverlay", ref config.PartyOverlayMode);
+        if (config.PartyOverlayMode) {
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(50 * ImGuiHelpers.GlobalScale);
+            configChanged |= ImGui.DragFloat("Size##PartyOverlay", ref config.PartyOverlayIconSize, 1f, 16f, 64f, "%.0f");
+
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(50 * ImGuiHelpers.GlobalScale);
+            configChanged |= ImGui.DragFloat("Height##PartyOverlay", ref config.PartyOverlayHeightOffset, 0.1f, 0f, 5f, "%.1f");
+
+            // Suppress mode
+            using (ImRaii.PushIndent()) {
+                ImGui.Text("Hide:");
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(120 * ImGuiHelpers.GlobalScale);
+                var partyOverlaySuppressMode = (int)config.PartyOverlaySuppressMode;
+                if (ImGui.Combo("##PartyOverlaySuppress", ref partyOverlaySuppressMode, "Never\0After Time\0On Combat\0")) {
+                    config.PartyOverlaySuppressMode = (SuppressMode)partyOverlaySuppressMode;
+                    configChanged = true;
+                }
+                if (config.PartyOverlaySuppressMode != SuppressMode.Never) {
+                    ImGui.SameLine();
+                    ImGui.SetNextItemWidth(40 * ImGuiHelpers.GlobalScale);
+                    configChanged |= ImGui.InputInt("sec##PartyOverlayDelay", ref config.PartyOverlaySuppressDelay);
+                    if (config.PartyOverlaySuppressDelay < 0) config.PartyOverlaySuppressDelay = 0;
+                }
+            }
+        }
+
+        ImGui.Spacing();
+        ImGui.Separator();
+
+        // ===== CONDITIONS =====
+        ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1f), "Conditions");
 
         configChanged |= ImGui.Checkbox("Only in Duties", ref config.OnlyInDuties);
-        if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Only show warnings while in a duty (after countdown finishes)");
-        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Only show warnings while in a duty (after countdown finishes)");
 
         configChanged |= ImGui.Checkbox("Hide in Quest Events", ref config.HideInQuestEvent);
-        if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Hide warnings during cutscenes and quest events");
-        }
-
-        configChanged |= ImGui.Checkbox("Auto Suppress Warnings", ref config.AutoSuppress);
-        if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Automatically suppress warnings for other players after a set time");
-        }
-
-        if (config.AutoSuppress) {
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(80 * ImGuiHelpers.GlobalScale);
-            configChanged |= ImGui.InputInt("seconds", ref config.AutoSuppressTime);
-            if (config.AutoSuppressTime < 1) config.AutoSuppressTime = 1;
-        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Hide warnings during cutscenes and quest events");
 
         if (configChanged) {
             config.Save();

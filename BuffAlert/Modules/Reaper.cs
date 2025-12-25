@@ -10,6 +10,7 @@ public class Reaper : ModuleBase<ReaperConfiguration> {
     public override ModuleName ModuleName => ModuleName.Reaper;
     protected override string DefaultWarningText => "Status Missing";
     public override uint[] CheckedActionIds => [SoulsowActionId];
+    public override bool SelfOnly => true;
 
     private const uint ReaperClassJobId = 39;
     private const uint MinimumLevel = 82;
@@ -20,6 +21,7 @@ public class Reaper : ModuleBase<ReaperConfiguration> {
     private DateTime lastCombatTime = DateTime.UtcNow;
     
     protected override bool ShouldEvaluate(IPlayerData playerData) {
+        // Self-only module (requires job gauge for full functionality)
         if (Services.ObjectTable.LocalPlayer?.EntityId != playerData.GetEntityId()) return false;
         if (playerData.GetClassJob() != ReaperClassJobId) return false;
         if (playerData.GetLevel() < MinimumLevel) return false;

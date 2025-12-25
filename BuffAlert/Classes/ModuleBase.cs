@@ -34,6 +34,18 @@ public abstract class ModuleBase {
     public virtual uint[] CheckedActionIds => [];
 
     /// <summary>
+    /// If true, this module only checks the local player (not party members).
+    /// Used by the UI to hide party-related display options.
+    /// </summary>
+    public virtual bool SelfOnly => false;
+
+    /// <summary>
+    /// If true, this module requires being in a party to show warnings.
+    /// Used by the UI to indicate party requirement.
+    /// </summary>
+    public virtual bool RequiresParty => false;
+
+    /// <summary>
     /// Gets the display settings for a specific action.
     /// </summary>
     public abstract ActionDisplaySettings GetActionDisplaySettings(uint actionId);
@@ -63,8 +75,6 @@ public abstract unsafe class ModuleBase<T> : ModuleBase, IDisposable where T : M
     public override void SaveConfig() => Config.Save();
 
     protected abstract string DefaultWarningText { get; }
-
-    private readonly HashSet<ulong> suppressedObjectIds = [];
 
     private readonly Dictionary<ulong, Stopwatch> suppressionTimer = new();
 
@@ -111,7 +121,9 @@ public abstract unsafe class ModuleBase<T> : ModuleBase, IDisposable where T : M
         if (HasDisallowedStatus(player)) return;
         if (deathTracker.IsDead(player)) return;
         if (!ShouldEvaluate(player)) return;
-        if (suppressedObjectIds.Contains(player.GetEntityId())) return;
+
+        // Skip if this player is already auto-suppressed for this module
+        if (System.SuppressionManager.IsPlayerSuppressed(ModuleName, player.GetEntityId())) return;
 
         EvaluateWarnings(player);
         EvaluateAutoSuppression(player);
@@ -128,8 +140,6 @@ public abstract unsafe class ModuleBase<T> : ModuleBase, IDisposable where T : M
         if (suppressionTimer.TryGetValue(player.GetEntityId(), out var timer)) {
             if (HasWarnings) {
                 if (timer.Elapsed.TotalSeconds >= System.SystemConfig.AutoSuppressTime) {
-                    suppressedObjectIds.Add(player.GetEntityId());
-                    // Also add to global suppression manager so overlay is hidden too
                     System.SuppressionManager.SuppressPlayer(ModuleName, player.GetEntityId());
                     Services.PluginLog.Warning($"[{ModuleName}]: Adding {player.GetName()} to auto-suppression list");
                 }

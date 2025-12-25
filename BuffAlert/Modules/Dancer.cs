@@ -8,6 +8,7 @@ public unsafe class Dancer : ModuleBase<DancerConfiguration> {
     public override ModuleName ModuleName => ModuleName.Dancer;
     protected override string DefaultWarningText => "Dance Partner";
     public override uint[] CheckedActionIds => [ClosedPositionActionId];
+    public override bool RequiresParty => true;
 
     private const uint DancerClassJobId = 38;
     private const uint MinimumLevel = 60;

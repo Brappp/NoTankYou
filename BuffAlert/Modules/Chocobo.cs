@@ -10,6 +10,7 @@ namespace BuffAlert.Modules;
 public unsafe class Chocobo : ModuleBase<ChocoboConfiguration> {
     public override ModuleName ModuleName => ModuleName.Chocobo;
     protected override string DefaultWarningText => "Chocobo Missing";
+    public override bool SelfOnly => true;
 
     private const uint GyshalGreensItemId = 4868;
     private uint? _gyshalGreensIconId;

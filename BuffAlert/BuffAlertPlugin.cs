@@ -85,15 +85,15 @@ public sealed class BuffAlertPlugin : IDalamudPlugin {
         if (!Services.ClientState.IsLoggedIn) return;
         if (Services.Condition.IsBetweenAreas()) return;
 
-        // Track combat state
-        var wasInCombat = System.IsInCombat;
-        System.IsInCombat = Services.Condition.IsInCombat();
-        if (System.IsInCombat && !wasInCombat) {
-            System.CombatStartTime = DateTime.UtcNow;
-        }
+        // Track combat state changes
+        System.OnCombatChanged(Services.Condition.IsInCombat());
 
         // Process and Collect Warnings
         System.ActiveWarnings = System.ModuleController.EvaluateWarnings();
+        System.OnWarningsUpdated();
+
+        // Update suppression based on config
+        System.UpdateSuppression();
 
         // Update the warning windows
         System.WarningWindow.UpdateWarnings(System.ActiveWarnings);

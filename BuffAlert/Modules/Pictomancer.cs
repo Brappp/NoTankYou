@@ -11,6 +11,7 @@ public class Pictomancer : ModuleBase<PictomancerConfiguration> {
     public override ModuleName ModuleName => ModuleName.Pictomancer;
     protected override string DefaultWarningText => "Missing Motif";
     public override uint[] CheckedActionIds => [CreatureActionId, WeaponActionId, LandscapeActionId];
+    public override bool SelfOnly => true;
 
     private const uint PictoClassJobId = 42;
     private const uint MinimumLevel = 30;

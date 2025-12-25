@@ -41,12 +41,13 @@ public class PartyFrameWindow : Window {
         // Only keep warnings for party members (not self)
         var localPlayerId = Services.ObjectTable.LocalPlayer?.EntityId ?? 0;
 
-        // Group by action to aggregate (one Food icon, not 10)
+        // Group by module+action to aggregate (one Food icon, not 10)
+        // Use IconId as fallback key when ActionId is 0 (consumables)
         // Count how many unique players have each warning type
         partyWarnings = warnings
             .Where(w => w.SourceEntityId != localPlayerId && w.SourceEntityId != 0)
             .Where(w => System.ModuleController.GetModule(w.SourceModule)?.GetActionDisplaySettings(w.ActionId)?.ShowInPartyFrame != false)
-            .GroupBy(w => w.ActionId)
+            .GroupBy(w => (w.SourceModule, Key: w.ActionId != 0 ? w.ActionId : w.IconId))
             .Select(g => (Warning: g.First(), Count: g.Select(w => w.SourceEntityId).Distinct().Count()))
             .OrderByDescending(x => x.Count)
             .ThenByDescending(x => x.Warning.Priority)
@@ -61,7 +62,7 @@ public class PartyFrameWindow : Window {
         // In test mode, always show
         if (System.SystemConfig.TestMode) return true;
 
-        if (System.ShouldHidePartyFrameForCombat()) return false;
+        if (System.ShouldHideDisplayMode(DisplayMode.PartyFrame)) return false;
         if (partyWarnings.Count == 0) return false;
 
         return true;

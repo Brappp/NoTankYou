@@ -41,11 +41,12 @@ public class WarningWindow : Window {
 
     public void UpdateWarnings(List<WarningState> warnings) {
         // Only show warnings for self (solo mode bar)
+        // Each distinct warning (by module + action/icon) gets its own icon
         var localPlayerId = Services.ObjectTable.LocalPlayer?.EntityId ?? 0;
         activeWarnings = warnings
             .Where(w => w.SourceEntityId == localPlayerId)
             .Where(w => System.ModuleController.GetModule(w.SourceModule)?.GetActionDisplaySettings(w.ActionId)?.ShowInSolo != false)
-            .GroupBy(w => (w.SourceModule, w.SourceEntityId))
+            .GroupBy(w => (w.SourceModule, Key: w.ActionId != 0 ? w.ActionId : w.IconId))
             .Select(g => g.OrderByDescending(w => w.Priority).First())
             .OrderByDescending(w => w.Priority)
             .ToList();
@@ -59,7 +60,7 @@ public class WarningWindow : Window {
         // In test mode, always show
         if (System.SystemConfig.TestMode) return true;
 
-        if (System.ShouldHideSoloForCombat()) return false;
+        if (System.ShouldHideDisplayMode(DisplayMode.Solo)) return false;
         if (activeWarnings.Count == 0) return false;
 
         return true;

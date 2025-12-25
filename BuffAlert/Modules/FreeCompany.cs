@@ -10,6 +10,7 @@ namespace BuffAlert.Modules;
 public class FreeCompany : ModuleBase<FreeCompanyConfiguration> {
     public override ModuleName ModuleName => ModuleName.FreeCompany;
     protected override string DefaultWarningText => "Free Company Buff";
+    public override bool SelfOnly => true;
 
     private const uint FreeCompanyActionId = 43;
     private int? _freeCompanyIconId;

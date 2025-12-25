@@ -1,0 +1,24 @@
+<Project Sdk="Dalamud.NET.Sdk/14.0.1">
+	<PropertyGroup>
+		<AssemblyVersion>7.3.0.1</AssemblyVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+    <PropertyGroup>
+        <Author>MidoriKami</Author>
+        <Name>NoTankYou</Name>
+        <InternalName>NoTankYou</InternalName>
+        <Punchline>Warns you when yourself or others are missing role-specific actions</Punchline>
+        <Description>Displays warnings when you or any party members are missing role specific actions such as partner buffs, pets, and tank stances.</Description>
+        <RepoUrl>https://github.com/MidoriKami/NoTankYou</RepoUrl>
+        <Tags>tanking;alerts;reminder;food;chocobo;spiritbond;gathering;warning</Tags>
+        <AcceptsFeedback>false</AcceptsFeedback>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="Dalamud.Bindings.ImGui">
+            <HintPath>$(DalamudLibPath)\Dalamud.Bindings.ImGui.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+</Project>
